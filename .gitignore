@@ -1,0 +1,12 @@
+.env
+.env.local
+node_modules/
+server-out.log
+server-err.log
+
+# Local runtime data. Production will use Supabase.
+data/*.json
+uploads/*
+
+!data/.gitkeep
+!uploads/.gitkeep

@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Jorsim Pod, podcasts sobre perros y gatos para escuchar al instante sin registro."
+    />
+    <title>Jorsim Pod | Historias para amantes de perros y gatos</title>
+    <link rel="preconnect" href="https://images.unsplash.com" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <header class="site-header" aria-label="Navegación principal">
+      <a class="brand" href="#inicio" aria-label="Jorsim Pod inicio">
+        <span class="brand-mark">J</span>
+        <span>
+          <strong>Jorsim Pod</strong>
+          <small>Perros, gatos, historias</small>
+        </span>
+      </a>
+      <nav class="nav-links" aria-label="Secciones">
+        <a href="#inicio">Inicio</a>
+        <a href="#explorar">Explorar</a>
+        <a href="#archivo">Archivo</a>
+        <a href="#consultas">Consultas</a>
+        <a href="#admin">Admin</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-button" id="notifyButton" type="button" aria-label="Ver notificaciones">
+          <span aria-hidden="true">!</span>
+          <span class="notification-count" id="notificationCount" hidden>0</span>
+        </button>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo oscuro">
+          <span class="toggle-dot"></span>
+          <span class="toggle-label">Oscuro</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="inicio">
+        <div class="hero-media" aria-hidden="true"></div>
+        <div class="hero-content">
+          <p class="eyebrow">Escucha abierta, sin registro</p>
+          <h1>Jorsim Pod</h1>
+          <p class="hero-copy">Porque cada ladrido y cada ronroneo esconden una historia.</p>
+          <div class="hero-pills" aria-label="Categorías destacadas">
+            <span>Podcasts</span>
+            <span>Entrevistas</span>
+            <span>Comunidad</span>
+          </div>
+          <div class="hero-search" role="search" aria-label="Buscar episodios">
+            <label class="sr-only" for="quickSearch">Buscar por palabra clave</label>
+            <input id="quickSearch" type="search" placeholder="Ansiedad, adopción, salud, juego..." />
+            <button id="quickSearchButton" type="button">Escuchar ahora</button>
+          </div>
+          <div class="hero-stats" aria-label="Resumen de Jorsim Pod">
+            <span><strong>240+</strong> episodios</span>
+            <span><strong>18</strong> temas</span>
+            <span><strong>4.9</strong> valoración</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="listen-now" aria-label="Reproductor principal">
+        <div class="now-info">
+          <span class="section-kicker">Reproducción inmediata</span>
+          <h2 id="currentTitle">Historias tranquilas para la primera noche en casa</h2>
+          <p id="currentDescription">
+            Consejos suaves para acompañar a un cachorro o gatito recién adoptado durante sus primeras horas.
+          </p>
+          <div class="episode-meta" id="currentMeta"></div>
+        </div>
+        <div class="player-shell">
+          <div class="cover-stack">
+            <img
+              id="currentCover"
+              src="https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=900&q=80"
+              alt=""
+            />
+            <button class="play-float" id="primaryPlay" type="button" aria-label="Reproducir episodio">
+              <span aria-hidden="true">▶</span>
+            </button>
+          </div>
+          <audio id="audioPlayer" controls controlslist="nodownload noplaybackrate" disablepictureinpicture preload="metadata">
+            <source
+              id="audioSource"
+              src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+              type="audio/mpeg"
+            />
+          </audio>
+          <div class="player-actions">
+            <button id="favoriteCurrent" type="button">Guardar favorito</button>
+            <button id="continueButton" type="button">Continuar escuchando</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace-band" id="explorar">
+        <div class="section-heading">
+          <span class="section-kicker">Explorar</span>
+          <h2>Encuentra una historia en segundos</h2>
+          <p>Filtra por fecha, tema, tipo de mascota o palabra clave, sin crear cuenta ni perderte en menús.</p>
+        </div>
+        <div class="search-panel">
+          <div class="field">
+            <label for="keyword">Palabra clave</label>
+            <input id="keyword" type="search" placeholder="Ej. veterinaria, miedo, entrenamiento" />
+          </div>
+          <div class="field">
+            <label for="topic">Tema</label>
+            <select id="topic">
+              <option value="">Todos los temas</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="petType">Mascota</label>
+            <select id="petType">
+              <option value="">Perros y gatos</option>
+              <option value="Perros">Perros</option>
+              <option value="Gatos">Gatos</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="dateFilter">Fecha</label>
+            <input id="dateFilter" type="date" />
+          </div>
+          <button id="clearFilters" class="ghost-button" type="button">Limpiar</button>
+        </div>
+        <div class="advanced-row" aria-label="Búsqueda avanzada">
+          <label><input id="onlyInterviews" type="checkbox" /> Entrevistas</label>
+          <label><input id="onlyShort" type="checkbox" /> Menos de 30 min</label>
+        </div>
+        <div class="episode-grid" id="episodeGrid" aria-live="polite"></div>
+      </section>
+
+      <section class="archive-section" id="archivo">
+        <div class="section-heading compact">
+          <span class="section-kicker">Archivo cronológico</span>
+          <h2>Todo ordenado por fecha</h2>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </section>
+
+      <section class="consultation-section" id="consultas">
+        <div class="consultation-copy">
+          <span class="section-kicker">Consultas abiertas</span>
+          <h2>Pregunta lo que necesites sobre perros y gatos</h2>
+          <p>
+            Un espacio gratuito para enviar dudas sobre convivencia, comportamiento, bienestar,
+            adopción o cuidados diarios. La consulta se prepara para enviarse a Mariola por email.
+          </p>
+        </div>
+        <form class="consultation-form" id="consultationForm">
+          <div class="form-split">
+            <div class="form-row">
+              <label for="consultName">Nombre</label>
+              <input id="consultName" name="name" type="text" placeholder="Tu nombre" required />
+            </div>
+            <div class="form-row">
+              <label for="consultEmail">Email</label>
+              <input id="consultEmail" name="email" type="email" placeholder="tu@email.com" required />
+            </div>
+          </div>
+          <div class="form-split">
+            <div class="form-row">
+              <label for="consultPet">Mascota</label>
+              <select id="consultPet" name="pet">
+                <option>Perro</option>
+                <option>Gato</option>
+                <option>Perro y gato</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="consultTopic">Tema</label>
+              <input id="consultTopic" name="topic" type="text" placeholder="Alimentación, conducta, salud..." />
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="consultMessage">Consulta</label>
+            <textarea id="consultMessage" name="message" rows="5" placeholder="Cuéntanos qué te preocupa o qué quieres saber." required></textarea>
+          </div>
+          <p class="field-note" id="consultationStatus" role="status"></p>
+          <button type="submit">Enviar consulta</button>
+        </form>
+      </section>
+
+      <section class="admin-section" id="admin">
+        <div class="section-heading">
+          <span class="section-kicker">Panel administrador</span>
+          <h2>Publica, programa y mide desde un solo lugar</h2>
+          <p>Acceso privado para subir podcasts, entrevistas y gestionar publicaciones.</p>
+        </div>
+        <form class="admin-login" id="adminLoginForm">
+          <div>
+            <span class="section-kicker">Acceso administradora</span>
+            <h3>Identificación requerida</h3>
+            <p>Solo la persona administradora puede ver las herramientas de subida y gestión.</p>
+          </div>
+          <div class="form-row">
+            <label for="adminEmail">Email</label>
+            <input id="adminEmail" type="email" autocomplete="username" placeholder="mariola@auladeformadores.com" required />
+          </div>
+          <div class="form-row">
+            <label for="adminPassword">Contraseña</label>
+            <input id="adminPassword" type="password" autocomplete="current-password" required />
+          </div>
+          <p class="login-error" id="adminLoginError" role="alert"></p>
+          <button type="submit">Entrar al panel</button>
+        </form>
+        <div class="admin-private" id="adminPrivate" hidden>
+          <div class="admin-session-bar">
+            <span>Sesión de administradora activa</span>
+            <button class="ghost-button" id="adminLogout" type="button">Cerrar sesión</button>
+          </div>
+          <div class="admin-layout">
+          <form class="admin-form" id="adminForm">
+            <div class="form-row">
+              <label for="adminTitle">Título</label>
+              <input id="adminTitle" type="text" placeholder="Nuevo episodio" />
+            </div>
+            <div class="form-row">
+              <label for="adminDescription">Descripción</label>
+              <textarea id="adminDescription" rows="4" placeholder="Resumen del contenido"></textarea>
+            </div>
+            <div class="form-split">
+              <div class="form-row">
+                <label for="adminTopic">Tema</label>
+                <select id="adminTopic" required>
+                  <option value="Nutrición">Nutrición</option>
+                  <option value="Conducta">Conducta</option>
+                  <option value="Salud">Salud</option>
+                  <option value="Bienestar">Bienestar</option>
+                  <option value="Adopción">Adopción</option>
+                  <option value="Juego">Juego</option>
+                  <option value="Historias">Historias</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label for="adminPet">Mascota</label>
+                <select id="adminPet" required>
+                  <option value="Perros">Perros</option>
+                  <option value="Gatos">Gatos</option>
+                  <option value="Perros y gatos">Perros y gatos</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-split">
+              <div class="form-row">
+                <label for="adminType">Tipo</label>
+                <select id="adminType" required>
+                  <option value="Podcast">Podcast</option>
+                  <option value="Entrevista">Entrevista</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-split">
+              <div class="form-row">
+                <label for="adminMedia">Audio</label>
+                <input id="adminMedia" type="file" accept="audio/mp3,audio/mpeg,audio/*" />
+                <small class="field-note">Por ahora podcast y entrevista se suben como audio.</small>
+              </div>
+              <div class="form-row">
+                <label for="adminCover">Portada opcional</label>
+                <input id="adminCover" type="file" accept="image/png,image/jpeg,image/webp,image/*" />
+              </div>
+            </div>
+            <div class="form-row">
+              <label for="publishDate">Programar</label>
+              <input id="publishDate" type="datetime-local" />
+            </div>
+            <button type="submit">Guardar publicación</button>
+          </form>
+          <div class="admin-insights">
+            <div class="stat-card">
+              <span>Reproducciones</span>
+              <strong id="dashboardPlays">0</strong>
+              <small>Escuchas registradas</small>
+            </div>
+            <div class="stat-card">
+              <span>Consultas</span>
+              <strong id="dashboardConsultations">0</strong>
+              <small>Mensajes recibidos</small>
+            </div>
+            <div class="stat-card">
+              <span>Episodios activos</span>
+              <strong id="dashboardPublished">0</strong>
+              <small id="dashboardScheduled">0 programados</small>
+            </div>
+            <div class="dashboard-panel">
+              <strong>Temas más escuchados</strong>
+              <div class="dashboard-bars" id="topicChart"></div>
+            </div>
+            <div class="dashboard-panel">
+              <strong>Episodios con más escuchas</strong>
+              <div class="dashboard-list" id="episodeRanking"></div>
+            </div>
+          </div>
+          </div>
+          <div class="admin-table-wrap">
+          <table>
+            <caption>
+              Próximas publicaciones
+            </caption>
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+                <th>Reproducciones</th>
+              </tr>
+            </thead>
+            <tbody id="adminRows"></tbody>
+          </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="notification-drawer" id="notificationDrawer" aria-label="Notificaciones" aria-hidden="true">
+      <div class="notification-head">
+        <strong>Notificaciones</strong>
+        <button id="closeNotifications" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <div class="notification-list" id="notificationList"></div>
+    </aside>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
