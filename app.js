@@ -1,101 +1,4 @@
-let episodes = [
-  {
-    id: "ep-101",
-    title: "Historias tranquilas para la primera noche en casa",
-    description:
-      "Consejos suaves para acompañar a un cachorro o gatito recién adoptado durante sus primeras horas.",
-    date: "2026-05-14",
-    topic: "Adopción",
-    pet: "Perros",
-    type: "Podcast",
-    duration: 24,
-    premium: false,
-    plays: 18420,
-    cover:
-      "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=900&q=80",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  },
-  {
-    id: "ep-102",
-    title: "Lo que tu gato dice cuando parece no decir nada",
-    description:
-      "Una etóloga felina traduce posturas, pausas y pequeños rituales de convivencia cotidiana.",
-    date: "2026-05-09",
-    topic: "Comportamiento",
-    pet: "Gatos",
-    type: "Entrevista",
-    duration: 38,
-    premium: true,
-    plays: 23110,
-    cover:
-      "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  },
-  {
-    id: "ep-103",
-    title: "Paseos que bajan el volumen del mundo",
-    description:
-      "Rutinas de paseo para perros nerviosos, mayores o con miedo a los ruidos urbanos.",
-    date: "2026-04-28",
-    topic: "Bienestar",
-    pet: "Perros",
-    type: "Podcast",
-    duration: 29,
-    premium: false,
-    plays: 16208,
-    cover:
-      "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  },
-  {
-    id: "ep-104",
-    title: "Veterinaria preventiva sin alarmas",
-    description:
-      "Vacunas, revisiones, alimentación y señales tempranas explicadas con calma y claridad.",
-    date: "2026-04-15",
-    topic: "Salud",
-    pet: "Gatos",
-    type: "Podcast",
-    duration: 31,
-    premium: false,
-    plays: 30544,
-    cover:
-      "https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=80",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-  },
-  {
-    id: "ep-105",
-    title: "Adoptar dos veces: una casa para volver a empezar",
-    description:
-      "Historias reales de familias que adoptaron animales adultos y descubrieron nuevos ritmos.",
-    date: "2026-03-30",
-    topic: "Historias",
-    pet: "Perros",
-    type: "Entrevista",
-    duration: 44,
-    premium: true,
-    plays: 11980,
-    cover:
-      "https://images.unsplash.com/photo-1529472119196-cb724127a98e?auto=format&fit=crop&w=900&q=80",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-  },
-  {
-    id: "ep-106",
-    title: "Juegos de interior para días largos",
-    description:
-      "Ideas sencillas para estimular olfato, curiosidad y vínculo en pisos pequeños.",
-    date: "2026-03-18",
-    topic: "Juego",
-    pet: "Gatos",
-    type: "Podcast",
-    duration: 21,
-    premium: false,
-    plays: 14202,
-    cover:
-      "https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=900&q=80",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-  },
-];
+let episodes = [];
 
 const state = {
   current: episodes[0],
@@ -429,6 +332,18 @@ function getAudioDurationMinutes(file) {
 }
 
 function setCurrentEpisode(episode, autoplay = true) {
+  if (!episode) {
+    selectors.currentTitle.textContent = "Sin episodios publicados";
+    selectors.currentDescription.textContent = "Cuando Mariola publique el primer audio, aparecerá aquí para escucharlo.";
+    selectors.currentCover.src = defaultCovers["Perros y gatos"];
+    selectors.currentCover.alt = "";
+    selectors.source.removeAttribute("src");
+    selectors.audio.load();
+    selectors.currentMeta.innerHTML = "";
+    selectors.favoriteCurrent.textContent = "Guardar favorito";
+    return;
+  }
+
   state.current = episode;
   selectors.currentTitle.textContent = episode.title;
   selectors.currentDescription.textContent = episode.description;
