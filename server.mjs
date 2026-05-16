@@ -7,11 +7,41 @@ const root = resolve(import.meta.dirname);
 const port = Number(process.argv[2] || process.env.PORT || 8080);
 const uploadsDir = join(root, "uploads");
 const dataDir = join(root, "data");
+
+function loadLocalEnv() {
+  [".env.local", ".env"].forEach((file) => {
+    const envPath = join(root, file);
+    if (!existsSync(envPath)) return;
+
+    readFileSync(envPath, "utf8")
+      .split(/\r?\n/)
+      .forEach((line) => {
+        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)\s*$/);
+        if (!match || process.env[match[1]]) return;
+        process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, "");
+      });
+  });
+}
+
+loadLocalEnv();
+
 const episodesFile = join(dataDir, "episodes.json");
 const consultationsFile = join(dataDir, "consultas.json");
 const analyticsFile = join(dataDir, "analytics.json");
 const adminEmail = "mariola@auladeformadores.com";
 const consultationEmail = process.env.CONSULTATION_EMAIL || "mariola@auladeformadores.com";
+const supabaseUrl = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabaseEnabled = Boolean(supabaseUrl && supabaseServiceKey);
+const supabaseTables = {
+  episodes: "jorsim_episodes",
+  consultations: "jorsim_consultations",
+  analytics: "jorsim_analytics_events",
+};
+const storageBuckets = {
+  audio: "episode-audio",
+  covers: "episode-covers",
+};
 const adminPasswordHash = "07d7fa3edb4ec5f179b4150dffe22bfd2f88a10378ab4b05fd76a4a13c14ecd5";
 const defaultCovers = {
   Gatos: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80",
@@ -103,7 +133,121 @@ function writeAnalytics(events) {
   writeFileSync(analyticsFile, JSON.stringify(events, null, 2));
 }
 
-function recordAnalyticsEvent(event) {
+async function supabaseRequest(pathname, options = {}) {
+  if (!supabaseEnabled) return null;
+
+  const response = await fetch(`${supabaseUrl}${pathname}`, {
+    ...options,
+    headers: {
+      apikey: supabaseServiceKey,
+      authorization: `Bearer ${supabaseServiceKey}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => "");
+    throw new Error(`Supabase ${response.status}: ${details}`);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+async function createSignedStorageUrl(bucket, path) {
+  if (!path || /^https?:\/\//.test(path) || path.startsWith("/uploads/")) return path;
+
+  const cleanPath = path.replace(new RegExp(`^${bucket}/`), "");
+  const signed = await supabaseRequest(`/storage/v1/object/sign/${bucket}/${encodeURIComponent(cleanPath)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ expiresIn: 3600 }),
+  });
+
+  const signedUrl = signed?.signedURL || signed?.signedUrl;
+  return signedUrl?.startsWith("http") ? signedUrl : `${supabaseUrl}${signedUrl}`;
+}
+
+function toStoredFileName(filename) {
+  return `${Date.now()}-${filename.replace(/[^\w.-]+/g, "-")}`;
+}
+
+async function uploadToSupabaseStorage(bucket, filename, file) {
+  const storedName = toStoredFileName(filename);
+  await supabaseRequest(`/storage/v1/object/${bucket}/${encodeURIComponent(storedName)}`, {
+    method: "POST",
+    headers: {
+      "content-type": file.type || "application/octet-stream",
+      "x-upsert": "false",
+    },
+    body: file.body,
+  });
+  return storedName;
+}
+
+async function normalizeSupabaseEpisode(row) {
+  const audio = await createSignedStorageUrl(storageBuckets.audio, row.audio_url);
+  const cover = await createSignedStorageUrl(storageBuckets.covers, row.cover_url);
+
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || "",
+    date: (row.publish_date || row.created_at || new Date().toISOString()).slice(0, 10),
+    topic: row.topic,
+    pet: row.pet,
+    type: row.type,
+    duration: Number(row.duration_minutes) || 26,
+    premium: Boolean(row.is_premium),
+    plays: Number(row.plays) || 0,
+    cover: cover || defaultCovers[row.pet] || defaultCovers["Perros y gatos"],
+    audio,
+  };
+}
+
+async function readEpisodesFromSupabase() {
+  const rows = await supabaseRequest(
+    `/rest/v1/${supabaseTables.episodes}?select=*&order=publish_date.desc,created_at.desc`
+  );
+  return Promise.all((rows || []).map(normalizeSupabaseEpisode));
+}
+
+async function readConsultationsFromSupabase() {
+  const rows = await supabaseRequest(
+    `/rest/v1/${supabaseTables.consultations}?select=*&order=created_at.desc&limit=100`
+  );
+  return (rows || []).map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    name: row.name,
+    email: row.email,
+    pet: row.pet,
+    topic: row.topic,
+    message: row.message,
+    to: row.sent_to,
+  }));
+}
+
+async function recordAnalyticsEvent(event) {
+  if (supabaseEnabled) {
+    await supabaseRequest(`/rest/v1/${supabaseTables.analytics}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        event_type: event.type,
+        episode_id: event.episodeId || null,
+        episode_title: event.episodeTitle || null,
+        topic: event.topic || null,
+        pet: event.pet || null,
+        user_agent: event.userAgent || null,
+      }),
+    });
+    return;
+  }
+
   const events = readAnalytics();
   events.unshift({
     id: `event-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -113,10 +257,27 @@ function recordAnalyticsEvent(event) {
   writeAnalytics(events.slice(0, 5000));
 }
 
-function buildDashboard() {
-  const events = readAnalytics();
-  const consultations = readConsultations();
-  const episodes = readEpisodes();
+async function readAnalyticsEvents() {
+  if (!supabaseEnabled) return readAnalytics();
+
+  const rows = await supabaseRequest(
+    `/rest/v1/${supabaseTables.analytics}?select=*&order=created_at.desc&limit=5000`
+  );
+  return (rows || []).map((row) => ({
+    id: row.id,
+    at: row.created_at,
+    type: row.event_type,
+    episodeId: row.episode_id,
+    episodeTitle: row.episode_title,
+    topic: row.topic,
+    pet: row.pet,
+  }));
+}
+
+async function buildDashboard() {
+  const events = await readAnalyticsEvents();
+  const consultations = supabaseEnabled ? await readConsultationsFromSupabase() : readConsultations();
+  const episodes = supabaseEnabled ? await readEpisodesFromSupabase() : readEpisodes();
   const plays = events.filter((event) => event.type === "episode_play");
   const topicCounts = {};
   const episodeCounts = {};
@@ -207,12 +368,25 @@ createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/episodes" && req.method === "GET") {
-    sendJson(res, 200, readEpisodes());
+    try {
+      sendJson(res, 200, supabaseEnabled ? await readEpisodesFromSupabase() : readEpisodes());
+    } catch {
+      sendJson(res, 200, readEpisodes());
+    }
     return;
   }
 
   if (url.pathname === "/api/dashboard" && req.method === "GET") {
-    sendJson(res, 200, buildDashboard());
+    try {
+      sendJson(res, 200, await buildDashboard());
+    } catch {
+      sendJson(res, 200, {
+        totals: { plays: 0, consultations: 0, published: 0, scheduled: 0 },
+        topics: [],
+        episodes: [],
+        recentConsultations: [],
+      });
+    }
     return;
   }
 
@@ -225,13 +399,18 @@ createServer(async (req, res) => {
       return;
     }
 
-    recordAnalyticsEvent({
-      type: event.type,
-      episodeId: event.episodeId || "",
-      episodeTitle: event.episodeTitle || "",
-      topic: event.topic || "",
-      pet: event.pet || "",
-    });
+    try {
+      await recordAnalyticsEvent({
+        type: event.type,
+        episodeId: event.episodeId || "",
+        episodeTitle: event.episodeTitle || "",
+        topic: event.topic || "",
+        pet: event.pet || "",
+        userAgent: req.headers["user-agent"] || "",
+      });
+    } catch {
+      // Analytics should not interrupt playback.
+    }
     sendJson(res, 201, { ok: true });
     return;
   }
@@ -273,14 +452,43 @@ createServer(async (req, res) => {
       message: consultation.message || "",
       to: consultationEmail,
     };
-    const consultations = readConsultations();
-    consultations.unshift(saved);
-    writeConsultations(consultations);
-    recordAnalyticsEvent({
-      type: "consultation_submitted",
-      topic: saved.topic,
-      pet: saved.pet,
-    });
+    try {
+      if (supabaseEnabled) {
+        await supabaseRequest(`/rest/v1/${supabaseTables.consultations}`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            name: saved.name,
+            email: saved.email,
+            pet: saved.pet,
+            topic: saved.topic,
+            message: saved.message,
+            sent_to: saved.to,
+          }),
+        });
+      } else {
+        const consultations = readConsultations();
+        consultations.unshift(saved);
+        writeConsultations(consultations);
+      }
+    } catch {
+      sendJson(res, 500, { error: "No se ha podido registrar la consulta." });
+      return;
+    }
+
+    try {
+      await recordAnalyticsEvent({
+        type: "consultation_submitted",
+        topic: saved.topic,
+        pet: saved.pet,
+        userAgent: req.headers["user-agent"] || "",
+      });
+    } catch {
+      // Consultations are saved even if analytics are unavailable.
+    }
     sendJson(res, 201, saved);
     return;
   }
@@ -302,15 +510,26 @@ createServer(async (req, res) => {
     }
 
     const safeName = media.filename.replace(/[^\w.-]+/g, "-");
-    const storedName = `${Date.now()}-${safeName}`;
-    writeFileSync(join(uploadsDir, storedName), media.body);
+    let storedName;
+
+    try {
+    if (supabaseEnabled) {
+      storedName = await uploadToSupabaseStorage(storageBuckets.audio, safeName, media);
+    } else {
+      storedName = toStoredFileName(safeName);
+      writeFileSync(join(uploadsDir, storedName), media.body);
+    }
 
     let coverUrl = defaultCovers[fields.pet] || defaultCovers["Perros y gatos"];
     if (cover && cover.type.startsWith("image/")) {
       const safeCoverName = cover.filename.replace(/[^\w.-]+/g, "-");
-      const storedCoverName = `${Date.now()}-${safeCoverName}`;
-      writeFileSync(join(uploadsDir, storedCoverName), cover.body);
-      coverUrl = `/uploads/${storedCoverName}`;
+      if (supabaseEnabled) {
+        coverUrl = await uploadToSupabaseStorage(storageBuckets.covers, safeCoverName, cover);
+      } else {
+        const storedCoverName = toStoredFileName(safeCoverName);
+        writeFileSync(join(uploadsDir, storedCoverName), cover.body);
+        coverUrl = `/uploads/${storedCoverName}`;
+      }
     }
 
     const episode = {
@@ -325,13 +544,39 @@ createServer(async (req, res) => {
       premium: false,
       plays: 0,
       cover: coverUrl,
-      audio: `/uploads/${storedName}`,
+      audio: supabaseEnabled ? storedName : `/uploads/${storedName}`,
     };
 
-    const episodes = readEpisodes();
-    episodes.unshift(episode);
-    writeEpisodes(episodes);
-    sendJson(res, 201, episode);
+    if (supabaseEnabled) {
+      const rows = await supabaseRequest(`/rest/v1/${supabaseTables.episodes}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          title: episode.title,
+          description: episode.description,
+          publish_date: episode.date,
+          topic: episode.topic,
+          pet: episode.pet,
+          type: episode.type,
+          duration_minutes: episode.duration,
+          audio_url: storedName,
+          cover_url: coverUrl,
+          is_premium: false,
+        }),
+      });
+      sendJson(res, 201, await normalizeSupabaseEpisode(rows[0]));
+    } else {
+      const episodes = readEpisodes();
+      episodes.unshift(episode);
+      writeEpisodes(episodes);
+      sendJson(res, 201, episode);
+    }
+    } catch {
+      sendJson(res, 500, { error: "No se ha podido guardar el audio." });
+    }
     return;
   }
 

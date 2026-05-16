@@ -666,7 +666,7 @@ selectors.consultationForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  selectors.consultationStatus.textContent = `Consulta recibida. La enviaremos a ${consultationEmail} cuando conectemos el envío por servidor.`;
+  selectors.consultationStatus.textContent = `Consulta recibida. Queda registrada para ${consultationEmail}.`;
   loadDashboard();
   event.target.reset();
 });
