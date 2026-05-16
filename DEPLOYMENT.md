@@ -1,11 +1,11 @@
 # Jorsim Pod deployment plan
 
-This project must be deployed as a new, separate project. Do not attach it to the existing Citopat, Au Process IA, or other Supabase/Vercel projects.
+This project must be deployed as a separate Vercel project. The current Supabase instance is shared, so all Jorsim Pod tables use the `jorsim_` prefix to avoid mixing with existing projects.
 
 ## Supabase
 
-1. Create a new Supabase project named `jorsim-pod`.
-2. Run `supabase/schema.sql` in the SQL editor for that new project.
+1. Use the existing shared Supabase instance.
+2. Run `supabase/schema.sql` in the SQL editor only if the `jorsim_` tables do not already exist.
 3. Create two Storage buckets:
    - `episode-audio` for podcast and interview audio files.
    - `episode-covers` for cover images.
