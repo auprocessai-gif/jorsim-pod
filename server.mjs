@@ -360,10 +360,24 @@ async function redirectToSignedCover(res, url) {
   res.end();
 }
 
-async function normalizeSupabaseEpisode(row) {
+async function getPlayCountsByEpisode() {
+  if (!supabaseEnabled) return new Map();
+
+  const rows = await supabaseRequest(
+    `/rest/v1/${supabaseTables.analytics}?select=episode_id&event_type=eq.episode_play&episode_id=not.is.null&limit=5000`
+  );
+  const counts = new Map();
+  (rows || []).forEach((row) => {
+    counts.set(row.episode_id, (counts.get(row.episode_id) || 0) + 1);
+  });
+  return counts;
+}
+
+async function normalizeSupabaseEpisode(row, playCounts = new Map()) {
   const audio = createProxiedStorageUrl(storageBuckets.audio, row.audio_path);
   const storedCover = row.cover_path?.includes("images.unsplash.com") ? "" : row.cover_path;
   const cover = createCoverStorageUrl(storedCover);
+  const analyticsPlays = playCounts.get(row.id);
 
   return {
     id: row.id,
@@ -375,7 +389,7 @@ async function normalizeSupabaseEpisode(row) {
     type: row.type,
     duration: Number(row.duration_minutes) || 26,
     premium: Boolean(row.is_premium),
-    plays: Number(row.plays) || 0,
+    plays: Number(analyticsPlays ?? row.plays) || 0,
     cover: cover || pickDefaultCover(row.pet, row.title || row.id),
     audio,
   };
@@ -385,7 +399,8 @@ async function readEpisodesFromSupabase() {
   const rows = await supabaseRequest(
     `/rest/v1/${supabaseTables.episodes}?select=*&order=publish_date.desc,created_at.desc`
   );
-  return Promise.all((rows || []).map(normalizeSupabaseEpisode));
+  const playCounts = await getPlayCountsByEpisode();
+  return Promise.all((rows || []).map((row) => normalizeSupabaseEpisode(row, playCounts)));
 }
 
 async function readConsultationsFromSupabase() {
