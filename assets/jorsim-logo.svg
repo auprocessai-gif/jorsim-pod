@@ -1,64 +1,40 @@
 <svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title id="title">Jorsim Pod</title>
   <defs>
-    <linearGradient id="bg" x1="52" y1="42" x2="268" y2="278" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="68" y1="46" x2="260" y2="276" gradientUnits="userSpaceOnUse">
       <stop stop-color="#063B4B"/>
-      <stop offset="0.56" stop-color="#0B5D72"/>
+      <stop offset="0.58" stop-color="#0B5E73"/>
       <stop offset="1" stop-color="#F47B58"/>
-    </linearGradient>
-    <linearGradient id="warm" x1="121" y1="178" x2="206" y2="268" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFF8EC"/>
-      <stop offset="1" stop-color="#F7D1B5"/>
     </linearGradient>
   </defs>
 
   <circle cx="160" cy="160" r="152" fill="url(#bg)"/>
-  <circle cx="160" cy="160" r="145" stroke="#FFF8EC" stroke-width="10" opacity="0.96"/>
+  <circle cx="160" cy="160" r="144" stroke="#FFF8EC" stroke-width="10"/>
 
   <path
-    d="M163 64H203C211.28 64 218 70.72 218 79V204C218 244.87 184.87 278 144 278H132C120.95 278 112 269.05 112 258C112 246.95 120.95 238 132 238H144C162.78 238 178 222.78 178 204V104H163C151.95 104 143 95.05 143 84C143 72.95 151.95 64 163 64Z"
+    d="M148 78H198C207.39 78 215 85.61 215 95V198C215 240.53 180.53 275 138 275H129C117.95 275 109 266.05 109 255C109 243.95 117.95 235 129 235H138C158.43 235 175 218.43 175 198V118H148C136.95 118 128 109.05 128 98C128 86.95 136.95 78 148 78Z"
     fill="#FFF8EC"
-    opacity="0.96"
   />
 
   <path
-    d="M73 166C93 166 94 148 115 148H132C157 148 174 166 185 188L194 206"
-    stroke="#FFF8EC"
-    stroke-width="11"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
-  <path
-    d="M74 168C89 174 96 181 116 180H130"
-    stroke="#F6B99F"
-    stroke-width="7"
-    stroke-linecap="round"
-  />
-  <circle cx="68" cy="165" r="9" fill="#FFF8EC"/>
-  <path
-    d="M137 142C136 168 148 177 161 154"
-    stroke="#FFF8EC"
-    stroke-width="8"
-    stroke-linecap="round"
-  />
-
-  <path
-    d="M124 232C124 206 139 187 160 187C175 187 188 197 195 211C203 202 215 201 225 209C217 216 214 228 216 241C216 259 195 273 170 273C145 273 124 256 124 232Z"
-    fill="url(#warm)"
-  />
-  <path d="M144 191L156 164L167 192" fill="#FFF8EC"/>
-
-  <path
-    d="M41 134V188M61 122V200M81 139V183M101 149V173"
+    d="M61 130V190M82 112V208M103 132V188"
     stroke="#9EC7CF"
-    stroke-width="10"
+    stroke-width="13"
     stroke-linecap="round"
   />
   <path
-    d="M245 128V192M265 144V176M285 154V166"
+    d="M238 130V190M259 143V177"
     stroke="#FFF8EC"
-    stroke-width="10"
+    stroke-width="13"
     stroke-linecap="round"
-    opacity="0.84"
+    opacity="0.9"
   />
+
+  <g transform="translate(0 2)">
+    <ellipse cx="136" cy="197" rx="40" ry="34" fill="#FAD8BE"/>
+    <circle cx="105" cy="166" r="15" fill="#FFF8EC"/>
+    <circle cx="125" cy="148" r="14" fill="#FFF8EC"/>
+    <circle cx="150" cy="148" r="14" fill="#FFF8EC"/>
+    <circle cx="169" cy="166" r="15" fill="#FFF8EC"/>
+  </g>
 </svg>
