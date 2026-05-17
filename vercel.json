@@ -21,7 +21,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "assets/(.*)",
+      "src": "assets/jorsim-logo.png",
       "use": "@vercel/static"
     }
   ],
@@ -39,8 +39,8 @@
       "dest": "/styles.css"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+      "src": "/assets/jorsim-logo.png",
+      "dest": "/assets/jorsim-logo.png"
     },
     {
       "src": "/(.*)",
