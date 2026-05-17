@@ -157,18 +157,11 @@ async function supabaseRequest(pathname, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function createSignedStorageUrl(bucket, path) {
+function createProxiedStorageUrl(bucket, path) {
   if (!path || /^https?:\/\//.test(path) || path.startsWith("/uploads/")) return path;
 
   const cleanPath = path.replace(new RegExp(`^${bucket}/`), "");
-  const signed = await supabaseRequest(`/storage/v1/object/sign/${bucket}/${encodeURIComponent(cleanPath)}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ expiresIn: 3600 }),
-  });
-
-  const signedUrl = signed?.signedURL || signed?.signedUrl;
-  return signedUrl?.startsWith("http") ? signedUrl : `${supabaseUrl}${signedUrl}`;
+  return `/api/media?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(cleanPath)}`;
 }
 
 function toStoredFileName(filename) {
@@ -188,9 +181,59 @@ async function uploadToSupabaseStorage(bucket, filename, file) {
   return storedName;
 }
 
+async function proxyStorageObject(req, res, url) {
+  if (!supabaseEnabled) {
+    sendJson(res, 503, { error: "Storage no configurado." });
+    return;
+  }
+
+  const bucket = url.searchParams.get("bucket") || "";
+  const objectPath = url.searchParams.get("path") || "";
+  const allowedBuckets = new Set(Object.values(storageBuckets));
+
+  if (!allowedBuckets.has(bucket) || !objectPath || objectPath.includes("..")) {
+    sendJson(res, 400, { error: "Archivo no valido." });
+    return;
+  }
+
+  const response = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${encodeURIComponent(objectPath)}`, {
+    headers: {
+      apikey: supabaseServiceKey,
+      authorization: `Bearer ${supabaseServiceKey}`,
+      ...(req.headers.range ? { range: req.headers.range } : {}),
+    },
+  });
+
+  if (!response.ok || !response.body) {
+    sendJson(res, response.status || 404, { error: "Archivo no disponible." });
+    return;
+  }
+
+  res.writeHead(response.status, {
+    "content-type": response.headers.get("content-type") || "application/octet-stream",
+    "content-length": response.headers.get("content-length") || undefined,
+    "content-range": response.headers.get("content-range") || undefined,
+    "accept-ranges": response.headers.get("accept-ranges") || "bytes",
+    "cache-control": "private, max-age=300",
+    "content-disposition": "inline",
+  });
+
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+    res.end();
+  } catch {
+    res.end();
+  }
+}
+
 async function normalizeSupabaseEpisode(row) {
-  const audio = await createSignedStorageUrl(storageBuckets.audio, row.audio_path);
-  const cover = await createSignedStorageUrl(storageBuckets.covers, row.cover_path);
+  const audio = createProxiedStorageUrl(storageBuckets.audio, row.audio_path);
+  const cover = createProxiedStorageUrl(storageBuckets.covers, row.cover_path);
 
   return {
     id: row.id,
@@ -433,6 +476,15 @@ export async function handleApiRequest(req, res) {
     sendJson(res, 200, {
       ok: email.trim().toLowerCase() === adminEmail && passwordHash === adminPasswordHash,
     });
+    return;
+  }
+
+  if (url.pathname === "/api/media" && req.method === "GET") {
+    try {
+      await proxyStorageObject(req, res, url);
+    } catch {
+      sendJson(res, 500, { error: "No se ha podido cargar el archivo." });
+    }
     return;
   }
 
