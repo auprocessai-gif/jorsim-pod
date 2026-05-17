@@ -2,6 +2,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeF
 import { createServer } from "node:http";
 import { basename, extname, join, normalize, resolve } from "node:path";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 const root = resolve(import.meta.dirname);
 const port = Number(process.argv[2] || process.env.PORT || 8080);
@@ -48,9 +49,6 @@ const defaultCovers = {
   Perros: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
   "Perros y gatos": "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=900&q=80",
 };
-
-mkdirSync(uploadsDir, { recursive: true });
-mkdirSync(dataDir, { recursive: true });
 
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -102,6 +100,7 @@ function readEpisodes() {
 }
 
 function writeEpisodes(episodes) {
+  mkdirSync(dataDir, { recursive: true });
   writeFileSync(episodesFile, JSON.stringify(episodes, null, 2));
 }
 
@@ -116,6 +115,7 @@ function readConsultations() {
 }
 
 function writeConsultations(consultations) {
+  mkdirSync(dataDir, { recursive: true });
   writeFileSync(consultationsFile, JSON.stringify(consultations, null, 2));
 }
 
@@ -130,6 +130,7 @@ function readAnalytics() {
 }
 
 function writeAnalytics(events) {
+  mkdirSync(dataDir, { recursive: true });
   writeFileSync(analyticsFile, JSON.stringify(events, null, 2));
 }
 
@@ -361,7 +362,7 @@ function parseMultipart(buffer, contentType) {
   return { fields, files };
 }
 
-createServer(async (req, res) => {
+export async function handleApiRequest(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
 
   if (req.method === "OPTIONS") {
@@ -582,7 +583,22 @@ createServer(async (req, res) => {
     return;
   }
 
-  const requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+  sendJson(res, 404, { error: "Ruta API no encontrada." });
+}
+
+function startLocalServer() {
+  mkdirSync(uploadsDir, { recursive: true });
+  mkdirSync(dataDir, { recursive: true });
+
+  createServer(async (req, res) => {
+    const url = new URL(req.url || "/", `http://${req.headers.host}`);
+
+    if (url.pathname.startsWith("/api/")) {
+      await handleApiRequest(req, res);
+      return;
+    }
+
+    const requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
 
   if (isProtectedMediaRequest(req, requested)) {
     send(res, 403, "Protected media");
@@ -604,6 +620,11 @@ createServer(async (req, res) => {
     "x-content-type-options": "nosniff",
   });
   createReadStream(filePath).pipe(res);
-}).listen(port, () => {
-  console.log(`Jorsim Pod disponible en http://localhost:${port}`);
-});
+  }).listen(port, () => {
+    console.log(`Jorsim Pod disponible en http://localhost:${port}`);
+  });
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  startLocalServer();
+}
