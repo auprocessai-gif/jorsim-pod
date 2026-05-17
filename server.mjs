@@ -31,6 +31,8 @@ const consultationsFile = join(dataDir, "consultas.json");
 const analyticsFile = join(dataDir, "analytics.json");
 const adminEmail = "mariola@auladeformadores.com";
 const consultationEmail = process.env.CONSULTATION_EMAIL || "mariola@auladeformadores.com";
+const resendApiKey = process.env.RESEND_API_KEY || "";
+const emailFrom = process.env.EMAIL_FROM || "Jorsim Pod <onboarding@resend.dev>";
 const supabaseUrl = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabaseEnabled = Boolean(supabaseUrl && supabaseServiceKey);
@@ -44,10 +46,22 @@ const storageBuckets = {
   covers: "episode-covers",
 };
 const adminPasswordHash = "07d7fa3edb4ec5f179b4150dffe22bfd2f88a10378ab4b05fd76a4a13c14ecd5";
-const defaultCovers = {
-  Gatos: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80",
-  Perros: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
-  "Perros y gatos": "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=900&q=80",
+const defaultCoverPools = {
+  Gatos: [
+    "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1495360010541-f48722b34f7d?auto=format&fit=crop&w=900&q=80",
+  ],
+  Perros: [
+    "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=900&q=80",
+  ],
+  "Perros y gatos": [
+    "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1601758124510-52d02ddb7cbd?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1537151625747-768eb6cf92b2?auto=format&fit=crop&w=900&q=80",
+  ],
 };
 
 const types = {
@@ -86,6 +100,14 @@ function createAdminToken(email) {
 function isAdminRequest(req) {
   const token = req.headers["x-admin-token"] || "";
   return token === createAdminToken(adminEmail);
+}
+
+function pickDefaultCover(pet, seed = "") {
+  const pool = defaultCoverPools[pet] || defaultCoverPools["Perros y gatos"];
+  const score = String(seed || pet)
+    .split("")
+    .reduce((total, char) => (total * 31 + char.charCodeAt(0)) >>> 0, 7);
+  return pool[score % pool.length];
 }
 
 function isProtectedMediaRequest(req, pathname) {
@@ -252,7 +274,8 @@ async function proxyStorageObject(req, res, url) {
 
 async function normalizeSupabaseEpisode(row) {
   const audio = createProxiedStorageUrl(storageBuckets.audio, row.audio_path);
-  const cover = createProxiedStorageUrl(storageBuckets.covers, row.cover_path);
+  const storedCover = row.cover_path?.includes("images.unsplash.com") ? "" : row.cover_path;
+  const cover = createProxiedStorageUrl(storageBuckets.covers, storedCover);
 
   return {
     id: row.id,
@@ -265,7 +288,7 @@ async function normalizeSupabaseEpisode(row) {
     duration: Number(row.duration_minutes) || 26,
     premium: Boolean(row.is_premium),
     plays: Number(row.plays) || 0,
-    cover: cover || defaultCovers[row.pet] || defaultCovers["Perros y gatos"],
+    cover: cover || pickDefaultCover(row.pet, row.title || row.id),
     audio,
   };
 }
@@ -320,6 +343,39 @@ async function recordAnalyticsEvent(event) {
     ...event,
   });
   writeAnalytics(events.slice(0, 5000));
+}
+
+async function sendConsultationEmail(consultation) {
+  if (!resendApiKey) return false;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${resendApiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from: emailFrom,
+      to: [consultation.to],
+      reply_to: consultation.email,
+      subject: `Nueva consulta Jorsim Pod: ${consultation.topic || consultation.pet || "Mascotas"}`,
+      text: [
+        `Nombre: ${consultation.name}`,
+        `Email: ${consultation.email}`,
+        `Mascota: ${consultation.pet || "-"}`,
+        `Tema: ${consultation.topic || "-"}`,
+        "",
+        consultation.message,
+      ].join("\n"),
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => "");
+    throw new Error(`Email ${response.status}: ${details}`);
+  }
+
+  return true;
 }
 
 async function readAnalyticsEvents() {
@@ -564,7 +620,15 @@ export async function handleApiRequest(req, res) {
     } catch {
       // Consultations are saved even if analytics are unavailable.
     }
-    sendJson(res, 201, saved);
+
+    let emailSent = false;
+    try {
+      emailSent = await sendConsultationEmail(saved);
+    } catch {
+      emailSent = false;
+    }
+
+    sendJson(res, 201, { ...saved, emailSent });
     return;
   }
 
@@ -600,7 +664,7 @@ export async function handleApiRequest(req, res) {
       writeFileSync(join(uploadsDir, storedName), media.body);
     }
 
-    let coverUrl = defaultCovers[fields.pet] || defaultCovers["Perros y gatos"];
+    let coverUrl = "";
     if (cover && cover.type.startsWith("image/")) {
       const safeCoverName = cover.filename.replace(/[^\w.-]+/g, "-");
       if (supabaseEnabled) {
@@ -643,7 +707,7 @@ export async function handleApiRequest(req, res) {
           type: episode.type,
           duration_minutes: episode.duration,
           audio_path: storedName,
-          cover_path: coverUrl,
+          cover_path: coverUrl || null,
           is_premium: false,
         }),
       });

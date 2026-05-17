@@ -16,11 +16,31 @@ const adminCredentials = {
 
 const consultationEmail = "mariola@auladeformadores.com";
 const fixedTopics = ["Nutrición", "Conducta", "Salud", "Bienestar", "Adopción", "Juego", "Historias"];
-const defaultCovers = {
-  Gatos: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80",
-  Perros: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
-  "Perros y gatos": "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=900&q=80",
+const defaultCoverPools = {
+  Gatos: [
+    "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1495360010541-f48722b34f7d?auto=format&fit=crop&w=900&q=80",
+  ],
+  Perros: [
+    "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=900&q=80",
+  ],
+  "Perros y gatos": [
+    "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1601758124510-52d02ddb7cbd?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1537151625747-768eb6cf92b2?auto=format&fit=crop&w=900&q=80",
+  ],
 };
+
+function pickDefaultCover(pet, seed = "") {
+  const pool = defaultCoverPools[pet] || defaultCoverPools["Perros y gatos"];
+  const score = String(seed || pet)
+    .split("")
+    .reduce((total, char) => (total * 31 + char.charCodeAt(0)) >>> 0, 7);
+  return pool[score % pool.length];
+}
 
 const selectors = {
   grid: document.querySelector("#episodeGrid"),
@@ -336,7 +356,7 @@ function setCurrentEpisode(episode, autoplay = true) {
   if (!episode) {
     selectors.currentTitle.textContent = "Sin episodios publicados";
     selectors.currentDescription.textContent = "Cuando Mariola publique el primer audio, aparecerá aquí para escucharlo.";
-    selectors.currentCover.src = defaultCovers["Perros y gatos"];
+    selectors.currentCover.src = pickDefaultCover("Perros y gatos", "empty");
     selectors.currentCover.alt = "";
     selectors.source.removeAttribute("src");
     selectors.audio.load();
@@ -687,6 +707,7 @@ selectors.consultationForm.addEventListener("submit", async (event) => {
   }
 
   let consultationSaved = location.protocol === "file:";
+  let consultationEmailSent = false;
 
   if (location.protocol !== "file:") {
     try {
@@ -696,6 +717,10 @@ selectors.consultationForm.addEventListener("submit", async (event) => {
         body: JSON.stringify(consultation),
       });
       consultationSaved = response.ok;
+      if (response.ok) {
+        const saved = await response.json();
+        consultationEmailSent = Boolean(saved.emailSent);
+      }
     } catch {
       consultationSaved = false;
     }
@@ -706,7 +731,9 @@ selectors.consultationForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  selectors.consultationStatus.textContent = `Consulta recibida. Queda registrada para ${consultationEmail}.`;
+  selectors.consultationStatus.textContent = consultationEmailSent
+    ? `Consulta enviada a ${consultationEmail}.`
+    : `Consulta recibida. Queda registrada para ${consultationEmail}.`;
   loadDashboard();
   event.target.reset();
 });
@@ -826,7 +853,7 @@ document.querySelector("#adminForm").addEventListener("submit", async (event) =>
     newEpisode = await response.json();
   } else {
     const audioUrl = mediaFile ? URL.createObjectURL(mediaFile) : "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3";
-    const coverUrl = coverFile ? URL.createObjectURL(coverFile) : defaultCovers[pet] || defaultCovers["Perros y gatos"];
+    const coverUrl = coverFile ? URL.createObjectURL(coverFile) : pickDefaultCover(pet, title);
     newEpisode = {
     id: `ep-${Date.now()}`,
     title,
