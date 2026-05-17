@@ -66,6 +66,7 @@ const selectors = {
   adminLoginError: document.querySelector("#adminLoginError"),
   adminPrivate: document.querySelector("#adminPrivate"),
   adminLogout: document.querySelector("#adminLogout"),
+  adminStatus: document.querySelector("#adminStatus"),
   dashboardPlays: document.querySelector("#dashboardPlays"),
   dashboardConsultations: document.querySelector("#dashboardConsultations"),
   dashboardPublished: document.querySelector("#dashboardPublished"),
@@ -799,6 +800,8 @@ selectors.adminLogout.addEventListener("click", () => {
 
 document.querySelector("#adminForm").addEventListener("submit", async (event) => {
   event.preventDefault();
+  selectors.adminStatus.textContent = "";
+  selectors.adminStatus.className = "admin-status";
 
   if (!state.adminAuthenticated) {
     renderAdminAccess();
@@ -824,8 +827,12 @@ document.querySelector("#adminForm").addEventListener("submit", async (event) =>
   if (!title) return;
 
   let newEpisode;
+  const submitButton = event.submitter || event.target.querySelector('button[type="submit"]');
 
   if (mediaFile && location.protocol !== "file:") {
+    selectors.adminStatus.textContent = "Subiendo audio...";
+    submitButton.disabled = true;
+
     const formData = new FormData();
     formData.set("title", title);
     formData.set("description", description);
@@ -839,18 +846,31 @@ document.querySelector("#adminForm").addEventListener("submit", async (event) =>
       formData.set("cover", coverFile);
     }
 
-    const response = await fetch("/api/episodes", {
-      method: "POST",
-      headers: { "x-admin-token": state.adminToken },
-      body: formData,
-    });
+    let response;
+    try {
+      response = await fetch("/api/episodes", {
+        method: "POST",
+        headers: { "x-admin-token": state.adminToken },
+        body: formData,
+      });
+    } catch {
+      selectors.adminStatus.textContent = "No se ha podido subir. Revisa la conexión e inténtalo de nuevo.";
+      selectors.adminStatus.classList.add("error");
+      submitButton.disabled = false;
+      return;
+    }
 
     if (!response.ok) {
-      alert("No se ha podido guardar el podcast. Vuelve a iniciar sesión e inténtalo de nuevo.");
+      const details = await response.json().catch(() => ({}));
+      selectors.adminStatus.textContent =
+        details.error || "No se ha podido guardar. Si el audio pesa mucho, lo subiremos con el método de archivos grandes.";
+      selectors.adminStatus.classList.add("error");
+      submitButton.disabled = false;
       return;
     }
 
     newEpisode = await response.json();
+    submitButton.disabled = false;
   } else {
     const audioUrl = mediaFile ? URL.createObjectURL(mediaFile) : "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3";
     const coverUrl = coverFile ? URL.createObjectURL(coverFile) : pickDefaultCover(pet, title);
@@ -876,6 +896,10 @@ document.querySelector("#adminForm").addEventListener("submit", async (event) =>
 
   const publishedEpisodes = getPublishedEpisodes();
   event.target.reset();
+  selectors.adminStatus.textContent = isPublished(newEpisode)
+    ? "Publicación subida correctamente."
+    : "Publicación programada correctamente.";
+  selectors.adminStatus.classList.add("success");
   hydrateTopics();
   renderEpisodes();
   renderTimeline();

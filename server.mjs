@@ -718,8 +718,14 @@ export async function handleApiRequest(req, res) {
       writeEpisodes(episodes);
       sendJson(res, 201, episode);
     }
-    } catch {
-      sendJson(res, 500, { error: "No se ha podido guardar el audio." });
+    } catch (error) {
+      const message = String(error?.message || "");
+      const tooLarge = message.includes("413") || message.toLowerCase().includes("body exceeded");
+      sendJson(res, tooLarge ? 413 : 500, {
+        error: tooLarge
+          ? "El audio es demasiado grande para subirlo por este formulario. Lo subimos con el método de archivos grandes."
+          : "No se ha podido guardar el audio. Revisa la sesión de admin o inténtalo de nuevo.",
+      });
     }
     return;
   }
