@@ -1,0 +1,61 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">Jorsim Pod</title>
+  <defs>
+    <linearGradient id="bg" x1="64" y1="42" x2="260" y2="282" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#063B4B"/>
+      <stop offset="0.58" stop-color="#0D5E73"/>
+      <stop offset="1" stop-color="#F47B58"/>
+    </linearGradient>
+    <linearGradient id="soft" x1="92" y1="106" x2="224" y2="244" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8EC"/>
+      <stop offset="1" stop-color="#F8D8BF"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="152" fill="url(#bg)"/>
+  <circle cx="160" cy="160" r="145" stroke="#FFF8EC" stroke-width="10" opacity="0.96"/>
+  <path
+    d="M205 68H245C252.18 68 258 73.82 258 81V213C258 251.66 226.66 283 188 283H169C158.51 283 150 274.49 150 264C150 253.51 158.51 245 169 245H188C205.67 245 220 230.67 220 213V106H205C194.51 106 186 97.49 186 87C186 76.51 194.51 68 205 68Z"
+    fill="#FFF8EC"
+  />
+  <path
+    d="M75 167C93 167 93 151 111 151H128C152 151 169 168 179 188L188 206"
+    stroke="#FFF8EC"
+    stroke-width="11"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M76 167C88 167 87 180 101 180H119"
+    stroke="#F6B99F"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+  <circle cx="69" cy="166" r="9" fill="#FFF8EC"/>
+  <path
+    d="M135 143C134 170 146 178 159 154"
+    stroke="#FFF8EC"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+  <path
+    d="M123 232C123 204 139 185 160 185C175 185 188 195 195 209C202 200 214 199 224 207C216 214 213 226 215 239C215 258 194 273 169 273C144 273 123 256 123 232Z"
+    fill="url(#soft)"
+  />
+  <path
+    d="M143 188L155 161L166 190"
+    fill="#FFF8EC"
+  />
+  <path
+    d="M42 134V188M62 123V199M82 139V183M102 149V173"
+    stroke="#9EC7CF"
+    stroke-width="10"
+    stroke-linecap="round"
+  />
+  <path
+    d="M270 127V193M288 145V175"
+    stroke="#FFF8EC"
+    stroke-width="10"
+    stroke-linecap="round"
+    opacity="0.86"
+  />
+</svg>

@@ -23,6 +23,10 @@
     {
       "src": "assets/jorsim-logo.png",
       "use": "@vercel/static"
+    },
+    {
+      "src": "assets/jorsim-logo.svg",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -41,6 +45,10 @@
     {
       "src": "/assets/jorsim-logo.png",
       "dest": "/assets/jorsim-logo.png"
+    },
+    {
+      "src": "/assets/jorsim-logo.svg",
+      "dest": "/assets/jorsim-logo.svg"
     },
     {
       "src": "/(.*)",
