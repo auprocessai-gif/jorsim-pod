@@ -196,6 +196,13 @@ function createProxiedStorageUrl(bucket, path) {
   return `/api/media?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(cleanPath)}`;
 }
 
+function createCoverStorageUrl(path) {
+  if (!path || /^https?:\/\//.test(path) || path.startsWith("/uploads/")) return path;
+
+  const cleanPath = path.replace(new RegExp(`^${storageBuckets.covers}/`), "");
+  return `/api/cover?path=${encodeURIComponent(cleanPath)}`;
+}
+
 function toStoredFileName(filename) {
   return `${Date.now()}-${filename.replace(/[^\w.-]+/g, "-")}`;
 }
@@ -225,6 +232,16 @@ async function createSignedUpload(bucket, filename) {
     path: storedName,
     uploadUrl: `${supabaseUrl}/storage/v1${signed.url}`,
   };
+}
+
+async function createSignedDownload(bucket, objectPath, expiresIn = 600) {
+  const signed = await supabaseRequest(`/storage/v1/object/sign/${bucket}/${encodeURIComponent(objectPath)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ expiresIn }),
+  });
+
+  return `${supabaseUrl}/storage/v1${signed.signedURL}`;
 }
 
 function buildEpisodePayload(fields, audioPath, coverPath = null) {
@@ -301,10 +318,31 @@ async function proxyStorageObject(req, res, url) {
   }
 }
 
+async function redirectToSignedCover(res, url) {
+  if (!supabaseEnabled) {
+    sendJson(res, 503, { error: "Storage no configurado." });
+    return;
+  }
+
+  const objectPath = url.searchParams.get("path") || "";
+  if (!objectPath || objectPath.includes("..")) {
+    sendJson(res, 400, { error: "Portada no valida." });
+    return;
+  }
+
+  const signedUrl = await createSignedDownload(storageBuckets.covers, objectPath);
+  res.writeHead(302, {
+    location: signedUrl,
+    "cache-control": "private, max-age=120",
+    "access-control-allow-origin": "*",
+  });
+  res.end();
+}
+
 async function normalizeSupabaseEpisode(row) {
   const audio = createProxiedStorageUrl(storageBuckets.audio, row.audio_path);
   const storedCover = row.cover_path?.includes("images.unsplash.com") ? "" : row.cover_path;
-  const cover = createProxiedStorageUrl(storageBuckets.covers, storedCover);
+  const cover = createCoverStorageUrl(storedCover);
 
   return {
     id: row.id,
@@ -618,6 +656,15 @@ export async function handleApiRequest(req, res) {
       await proxyStorageObject(req, res, url);
     } catch {
       sendJson(res, 500, { error: "No se ha podido cargar el archivo." });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/cover" && req.method === "GET") {
+    try {
+      await redirectToSignedCover(res, url);
+    } catch {
+      sendJson(res, 500, { error: "No se ha podido cargar la portada." });
     }
     return;
   }
