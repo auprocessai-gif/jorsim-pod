@@ -6,6 +6,7 @@ const state = {
   progress: JSON.parse(localStorage.getItem("petcast:progress") || "{}"),
   comments: JSON.parse(localStorage.getItem("petcast:comments") || "{}"),
   adminAuthenticated: localStorage.getItem("petcast:admin-auth") === "true",
+  adminToken: localStorage.getItem("petcast:admin-token") || "",
   trackedPlays: new Set(),
 };
 
@@ -484,10 +485,44 @@ function renderAdminRows() {
         <td>${getEpisodeStatus(episode)}</td>
         <td>${formatDate(episode.date)}</td>
         <td>${episode.plays.toLocaleString("es")}</td>
+        <td><button class="danger-button" type="button" data-delete-episode="${episode.id}">Borrar</button></td>
       </tr>
     `
     )
     .join("");
+}
+
+async function deleteEpisode(id) {
+  const episode = episodes.find((item) => item.id === id);
+  if (!episode || !state.adminAuthenticated) return;
+
+  const confirmed = window.confirm(`¿Borrar "${episode.title}"? Esta acción quitará el audio de la web.`);
+  if (!confirmed) return;
+
+  const response = await fetch(`/api/episodes?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { "x-admin-token": state.adminToken },
+  });
+
+  if (!response.ok) {
+    alert("No se ha podido borrar el episodio. Vuelve a iniciar sesión e inténtalo de nuevo.");
+    return;
+  }
+
+  episodes = episodes.filter((item) => item.id !== id);
+  delete state.comments[id];
+  delete state.progress[id];
+  state.favorites.delete(id);
+  saveComments();
+  saveProgress();
+  saveFavorites();
+  hydrateTopics();
+  renderEpisodes();
+  renderTimeline();
+  renderAdminRows();
+  loadDashboard();
+  renderNotifications();
+  setCurrentEpisode(getPublishedEpisodes()[0] || episodes[0], false);
 }
 
 function hydrateTopics() {
@@ -507,6 +542,7 @@ function playById(id) {
 document.addEventListener("click", (event) => {
   const playButton = event.target.closest("[data-play]");
   const favoriteButton = event.target.closest("[data-favorite]");
+  const deleteButton = event.target.closest("[data-delete-episode]");
 
   if (playButton) {
     playById(playButton.dataset.play);
@@ -521,6 +557,10 @@ document.addEventListener("click", (event) => {
     if (state.current.id === id) {
       setCurrentEpisode(state.current, false);
     }
+  }
+
+  if (deleteButton) {
+    deleteEpisode(deleteButton.dataset.deleteEpisode);
   }
 });
 
@@ -699,7 +739,11 @@ selectors.adminLoginForm.addEventListener("submit", async (event) => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    canEnter = response.ok && (await response.json()).ok;
+    if (response.ok) {
+      const login = await response.json();
+      canEnter = login.ok;
+      state.adminToken = login.token || "";
+    }
   } else {
     selectors.adminLoginError.textContent = "Abre la app desde el enlace local para entrar al panel admin.";
     return;
@@ -708,6 +752,7 @@ selectors.adminLoginForm.addEventListener("submit", async (event) => {
   if (email === adminCredentials.email && canEnter) {
     state.adminAuthenticated = true;
     localStorage.setItem("petcast:admin-auth", "true");
+    localStorage.setItem("petcast:admin-token", state.adminToken);
     event.target.reset();
     renderAdminAccess();
     loadDashboard();
@@ -719,7 +764,9 @@ selectors.adminLoginForm.addEventListener("submit", async (event) => {
 
 selectors.adminLogout.addEventListener("click", () => {
   state.adminAuthenticated = false;
+  state.adminToken = "";
   localStorage.removeItem("petcast:admin-auth");
+  localStorage.removeItem("petcast:admin-token");
   renderAdminAccess();
 });
 
@@ -767,11 +814,12 @@ document.querySelector("#adminForm").addEventListener("submit", async (event) =>
 
     const response = await fetch("/api/episodes", {
       method: "POST",
+      headers: { "x-admin-token": state.adminToken },
       body: formData,
     });
 
     if (!response.ok) {
-      alert("No se ha podido guardar el podcast en el servidor local.");
+      alert("No se ha podido guardar el podcast. Vuelve a iniciar sesión e inténtalo de nuevo.");
       return;
     }
 
@@ -818,6 +866,11 @@ document.querySelector("#adminForm").addEventListener("submit", async (event) =>
 });
 
 async function init() {
+  if (state.adminAuthenticated && !state.adminToken) {
+    state.adminAuthenticated = false;
+    localStorage.removeItem("petcast:admin-auth");
+  }
+
   if (localStorage.getItem("petcast:theme") === "dark") {
     document.body.classList.add("dark");
   }

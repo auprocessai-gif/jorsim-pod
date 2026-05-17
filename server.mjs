@@ -78,6 +78,16 @@ function sendJson(res, status, body) {
   send(res, status, JSON.stringify(body), "application/json; charset=utf-8");
 }
 
+function createAdminToken(email) {
+  const seed = `${email.trim().toLowerCase()}:${adminPasswordHash}:${supabaseServiceKey || "local"}`;
+  return createHash("sha256").update(seed).digest("hex");
+}
+
+function isAdminRequest(req) {
+  const token = req.headers["x-admin-token"] || "";
+  return token === createAdminToken(adminEmail);
+}
+
 function isProtectedMediaRequest(req, pathname) {
   if (!pathname.startsWith("/uploads/")) return false;
 
@@ -179,6 +189,15 @@ async function uploadToSupabaseStorage(bucket, filename, file) {
     body: file.body,
   });
   return storedName;
+}
+
+async function deleteSupabaseStorageObject(bucket, objectPath) {
+  if (!objectPath || /^https?:\/\//.test(objectPath) || objectPath.startsWith("/uploads/")) return;
+
+  const cleanPath = objectPath.replace(new RegExp(`^${bucket}/`), "");
+  await supabaseRequest(`/storage/v1/object/${bucket}/${encodeURIComponent(cleanPath)}`, {
+    method: "DELETE",
+  });
 }
 
 async function proxyStorageObject(req, res, url) {
@@ -475,6 +494,7 @@ export async function handleApiRequest(req, res) {
 
     sendJson(res, 200, {
       ok: email.trim().toLowerCase() === adminEmail && passwordHash === adminPasswordHash,
+      token: email.trim().toLowerCase() === adminEmail && passwordHash === adminPasswordHash ? createAdminToken(email) : "",
     });
     return;
   }
@@ -549,6 +569,11 @@ export async function handleApiRequest(req, res) {
   }
 
   if (url.pathname === "/api/episodes" && req.method === "POST") {
+    if (!isAdminRequest(req)) {
+      sendJson(res, 401, { error: "No autorizado." });
+      return;
+    }
+
     const body = await readRequest(req);
     const { fields, files } = parseMultipart(body, req.headers["content-type"] || "");
     const media = files.media;
@@ -635,6 +660,47 @@ export async function handleApiRequest(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/episodes" && req.method === "DELETE") {
+    if (!isAdminRequest(req)) {
+      sendJson(res, 401, { error: "No autorizado." });
+      return;
+    }
+
+    const id = url.searchParams.get("id") || "";
+    if (!id) {
+      sendJson(res, 400, { error: "Falta el episodio." });
+      return;
+    }
+
+    try {
+      if (supabaseEnabled) {
+        const rows = await supabaseRequest(
+          `/rest/v1/${supabaseTables.episodes}?select=id,audio_path,cover_path&id=eq.${encodeURIComponent(id)}&limit=1`
+        );
+        const episode = rows?.[0];
+
+        if (!episode) {
+          sendJson(res, 404, { error: "Episodio no encontrado." });
+          return;
+        }
+
+        await supabaseRequest(`/rest/v1/${supabaseTables.episodes}?id=eq.${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: { prefer: "return=minimal" },
+        });
+        await deleteSupabaseStorageObject(storageBuckets.audio, episode.audio_path);
+        await deleteSupabaseStorageObject(storageBuckets.covers, episode.cover_path);
+      } else {
+        writeEpisodes(readEpisodes().filter((episode) => episode.id !== id));
+      }
+
+      sendJson(res, 200, { ok: true });
+    } catch {
+      sendJson(res, 500, { error: "No se ha podido borrar el episodio." });
+    }
+    return;
+  }
+
   sendJson(res, 404, { error: "Ruta API no encontrada." });
 }
 
@@ -650,7 +716,7 @@ function startLocalServer() {
       return;
     }
 
-    const requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+  const requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
 
   if (isProtectedMediaRequest(req, requested)) {
     send(res, 403, "Protected media");

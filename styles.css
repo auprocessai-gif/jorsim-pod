@@ -1025,6 +1025,20 @@ th {
   font-size: 0.82rem;
 }
 
+.danger-button {
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--line));
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  font-weight: 850;
+}
+
+.danger-button:hover {
+  background: var(--accent);
+  color: #fffaf4;
+}
+
 .notification-drawer {
   position: fixed;
   right: 18px;
