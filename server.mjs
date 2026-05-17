@@ -151,7 +151,9 @@ async function supabaseRequest(pathname, options = {}) {
   }
 
   if (response.status === 204) return null;
-  return response.json();
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function createSignedStorageUrl(bucket, path) {
@@ -186,8 +188,8 @@ async function uploadToSupabaseStorage(bucket, filename, file) {
 }
 
 async function normalizeSupabaseEpisode(row) {
-  const audio = await createSignedStorageUrl(storageBuckets.audio, row.audio_url);
-  const cover = await createSignedStorageUrl(storageBuckets.covers, row.cover_url);
+  const audio = await createSignedStorageUrl(storageBuckets.audio, row.audio_path);
+  const cover = await createSignedStorageUrl(storageBuckets.covers, row.cover_path);
 
   return {
     id: row.id,
@@ -562,8 +564,8 @@ createServer(async (req, res) => {
           pet: episode.pet,
           type: episode.type,
           duration_minutes: episode.duration,
-          audio_url: storedName,
-          cover_url: coverUrl,
+          audio_path: storedName,
+          cover_path: coverUrl,
           is_premium: false,
         }),
       });
