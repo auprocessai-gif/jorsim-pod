@@ -45,6 +45,15 @@ const storageBuckets = {
   audio: "episode-audio",
   covers: "episode-covers",
 };
+const episodeTopics = {
+  nutricion: "Nutrici\u00f3n",
+  conducta: "Conducta",
+  salud: "Salud",
+  bienestar: "Bienestar",
+  adopcion: "Adopci\u00f3n",
+  juego: "Juego",
+  historias: "Historias",
+};
 const adminPasswordHash = "07d7fa3edb4ec5f179b4150dffe22bfd2f88a10378ab4b05fd76a4a13c14ecd5";
 const defaultCoverPools = {
   Gatos: [
@@ -244,12 +253,24 @@ async function createSignedDownload(bucket, objectPath, expiresIn = 600) {
   return `${supabaseUrl}/storage/v1${signed.signedURL}`;
 }
 
+function normalizeEpisodeTopic(topic) {
+  const raw = String(topic || "").trim();
+  const key = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (key.startsWith("nutrici")) return episodeTopics.nutricion;
+  if (key.startsWith("adopci")) return episodeTopics.adopcion;
+  return episodeTopics[key] || episodeTopics.nutricion;
+}
+
 function buildEpisodePayload(fields, audioPath, coverPath = null) {
   return {
     title: fields.title || audioPath.replace(/\.[^/.]+$/, "").replaceAll("-", " "),
     description: fields.description || "Nueva publicacion preparada desde el panel administrador.",
     publish_date: fields.date || new Date().toISOString().slice(0, 10),
-    topic: fields.topic || "Nutricion",
+    topic: normalizeEpisodeTopic(fields.topic),
     pet: fields.pet || "Perros",
     type: fields.type || "Podcast",
     duration_minutes: Number(fields.duration) || 26,
