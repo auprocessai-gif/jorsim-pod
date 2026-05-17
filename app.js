@@ -353,6 +353,38 @@ function getAudioDurationMinutes(file) {
   });
 }
 
+async function requestUploadUrl(bucket, file) {
+  const response = await fetch("/api/upload-url", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-admin-token": state.adminToken,
+    },
+    body: JSON.stringify({ bucket, filename: file.name }),
+  });
+
+  const details = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(details.error || "No se ha podido preparar la subida.");
+  }
+
+  return details;
+}
+
+async function uploadFileToSignedUrl(uploadUrl, file) {
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "content-type": file.type || "application/octet-stream",
+    },
+    body: file,
+  });
+
+  if (!response.ok) {
+    throw new Error("No se ha podido subir el archivo a Supabase.");
+  }
+}
+
 function setCurrentEpisode(episode, autoplay = true) {
   if (!episode) {
     selectors.currentTitle.textContent = "Sin episodios publicados";
@@ -830,31 +862,44 @@ document.querySelector("#adminForm").addEventListener("submit", async (event) =>
   const submitButton = event.submitter || event.target.querySelector('button[type="submit"]');
 
   if (mediaFile && location.protocol !== "file:") {
-    selectors.adminStatus.textContent = "Subiendo audio...";
+    selectors.adminStatus.textContent = "Preparando subida...";
     submitButton.disabled = true;
-
-    const formData = new FormData();
-    formData.set("title", title);
-    formData.set("description", description);
-    formData.set("topic", topic);
-    formData.set("pet", pet);
-    formData.set("type", type);
-    formData.set("duration", String(duration));
-    formData.set("date", publishDate ? publishDate.slice(0, 10) : new Date().toISOString().slice(0, 10));
-    formData.set("media", mediaFile);
-    if (coverFile) {
-      formData.set("cover", coverFile);
-    }
 
     let response;
     try {
+      const audioUpload = await requestUploadUrl("episode-audio", mediaFile);
+      selectors.adminStatus.textContent = "Subiendo audio...";
+      await uploadFileToSignedUrl(audioUpload.uploadUrl, mediaFile);
+
+      let coverPath = "";
+      if (coverFile) {
+        const coverUpload = await requestUploadUrl("episode-covers", coverFile);
+        selectors.adminStatus.textContent = "Subiendo portada...";
+        await uploadFileToSignedUrl(coverUpload.uploadUrl, coverFile);
+        coverPath = coverUpload.path;
+      }
+
+      selectors.adminStatus.textContent = "Guardando publicacion...";
       response = await fetch("/api/episodes", {
         method: "POST",
-        headers: { "x-admin-token": state.adminToken },
-        body: formData,
+        headers: {
+          "content-type": "application/json",
+          "x-admin-token": state.adminToken,
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          topic,
+          pet,
+          type,
+          duration,
+          date: publishDate ? publishDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+          audioPath: audioUpload.path,
+          coverPath,
+        }),
       });
-    } catch {
-      selectors.adminStatus.textContent = "No se ha podido subir. Revisa la conexión e inténtalo de nuevo.";
+    } catch (error) {
+      selectors.adminStatus.textContent = error.message || "No se ha podido subir. Revisa la conexion e intentalo de nuevo.";
       selectors.adminStatus.classList.add("error");
       submitButton.disabled = false;
       return;

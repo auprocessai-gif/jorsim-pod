@@ -213,6 +213,35 @@ async function uploadToSupabaseStorage(bucket, filename, file) {
   return storedName;
 }
 
+async function createSignedUpload(bucket, filename) {
+  const storedName = toStoredFileName(filename);
+  const signed = await supabaseRequest(`/storage/v1/object/upload/sign/${bucket}/${encodeURIComponent(storedName)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  return {
+    path: storedName,
+    uploadUrl: `${supabaseUrl}/storage/v1${signed.url}`,
+  };
+}
+
+function buildEpisodePayload(fields, audioPath, coverPath = null) {
+  return {
+    title: fields.title || audioPath.replace(/\.[^/.]+$/, "").replaceAll("-", " "),
+    description: fields.description || "Nueva publicacion preparada desde el panel administrador.",
+    publish_date: fields.date || new Date().toISOString().slice(0, 10),
+    topic: fields.topic || "Nutricion",
+    pet: fields.pet || "Perros",
+    type: fields.type || "Podcast",
+    duration_minutes: Number(fields.duration) || 26,
+    audio_path: audioPath,
+    cover_path: coverPath || null,
+    is_premium: false,
+  };
+}
+
 async function deleteSupabaseStorageObject(bucket, objectPath) {
   if (!objectPath || /^https?:\/\//.test(objectPath) || objectPath.startsWith("/uploads/")) return;
 
@@ -497,6 +526,35 @@ export async function handleApiRequest(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/upload-url" && req.method === "POST") {
+    if (!isAdminRequest(req)) {
+      sendJson(res, 401, { error: "No autorizado." });
+      return;
+    }
+
+    if (!supabaseEnabled) {
+      sendJson(res, 503, { error: "Storage no configurado." });
+      return;
+    }
+
+    const body = parseJsonBody(await readRequest(req));
+    const bucket = body?.bucket;
+    const filename = body?.filename;
+    const allowedBuckets = new Set(Object.values(storageBuckets));
+
+    if (!allowedBuckets.has(bucket) || !filename) {
+      sendJson(res, 400, { error: "Solicitud de subida no valida." });
+      return;
+    }
+
+    try {
+      sendJson(res, 201, await createSignedUpload(bucket, basename(filename)));
+    } catch {
+      sendJson(res, 500, { error: "No se ha podido preparar la subida." });
+    }
+    return;
+  }
+
   if (url.pathname === "/api/dashboard" && req.method === "GET") {
     try {
       sendJson(res, 200, await buildDashboard());
@@ -639,6 +697,36 @@ export async function handleApiRequest(req, res) {
     }
 
     const body = await readRequest(req);
+    const contentType = req.headers["content-type"] || "";
+
+    if (contentType.includes("application/json")) {
+      if (!supabaseEnabled) {
+        sendJson(res, 503, { error: "Base de datos no configurada." });
+        return;
+      }
+
+      const fields = parseJsonBody(body);
+      if (!fields?.audioPath) {
+        sendJson(res, 400, { error: "Falta el archivo de audio." });
+        return;
+      }
+
+      try {
+        const rows = await supabaseRequest(`/rest/v1/${supabaseTables.episodes}`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            prefer: "return=representation",
+          },
+          body: JSON.stringify(buildEpisodePayload(fields, fields.audioPath, fields.coverPath)),
+        });
+        sendJson(res, 201, await normalizeSupabaseEpisode(rows[0]));
+      } catch {
+        sendJson(res, 500, { error: "El audio se ha subido, pero no se ha podido guardar la publicacion." });
+      }
+      return;
+    }
+
     const { fields, files } = parseMultipart(body, req.headers["content-type"] || "");
     const media = files.media;
     const cover = files.cover;
@@ -698,18 +786,15 @@ export async function handleApiRequest(req, res) {
           "content-type": "application/json",
           prefer: "return=representation",
         },
-        body: JSON.stringify({
+        body: JSON.stringify(buildEpisodePayload({
           title: episode.title,
           description: episode.description,
-          publish_date: episode.date,
+          date: episode.date,
           topic: episode.topic,
           pet: episode.pet,
           type: episode.type,
-          duration_minutes: episode.duration,
-          audio_path: storedName,
-          cover_path: coverUrl || null,
-          is_premium: false,
-        }),
+          duration: episode.duration,
+        }, storedName, coverUrl)),
       });
       sendJson(res, 201, await normalizeSupabaseEpisode(rows[0]));
     } else {
