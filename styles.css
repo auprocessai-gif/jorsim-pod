@@ -127,13 +127,21 @@ img {
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-2), var(--accent));
-  color: #fffaf4;
-  font-weight: 900;
-  box-shadow: 0 10px 28px rgba(35, 106, 139, 0.24);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--cream) 88%, white);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  box-shadow: 0 10px 24px rgba(35, 106, 139, 0.18);
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .brand strong,
@@ -1193,6 +1201,12 @@ th {
 
   .brand {
     min-width: 0;
+  }
+
+  .brand-mark {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
   }
 
   .header-actions {
